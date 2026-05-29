@@ -496,6 +496,17 @@
         }
 
         // Filtering function
+        function gradeMatches(courseGrade, selectedGrade) {
+            if (selectedGrade === 'all') return true;
+            if (!courseGrade.includes('~')) return courseGrade === selectedGrade;
+            const gradeOrder = ["一", "二", "三", "四", "碩"];
+            const [start, end] = courseGrade.split('~');
+            const startIdx = gradeOrder.indexOf(start);
+            const endIdx = gradeOrder.indexOf(end);
+            const selectedIdx = gradeOrder.indexOf(selectedGrade);
+            return selectedIdx >= startIdx && selectedIdx <= endIdx;
+        }
+
         function applyFilters() {
             const searchQuery = document.getElementById('search-input').value.trim().toLowerCase();
             const selectedGrade = document.getElementById('grade-filter').value;
@@ -504,11 +515,11 @@
             const fullDataset = getActiveDataset();
 
             const filtered = fullDataset.filter(course => {
-                const matchesSearch = course.name.toLowerCase().includes(searchQuery) || 
+                const matchesSearch = course.name.toLowerCase().includes(searchQuery) ||
                                       course.teacher.toLowerCase().includes(searchQuery) ||
                                       (course.classroom && course.classroom.toLowerCase().includes(searchQuery));
-                
-                const matchesGrade = selectedGrade === 'all' || course.grade === selectedGrade;
+
+                const matchesGrade = gradeMatches(course.grade, selectedGrade);
                 const matchesType = selectedType === 'all' || course.type === selectedType;
 
                 return matchesSearch && matchesGrade && matchesType;
