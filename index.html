@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖資系 115學年度 課表查詢系統</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter & Noto Sans TC -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #f8fafc;
+        }
+        .course-card {
+            border-radius: 0.5rem;
+            padding: 0.6rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .course-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .course-required {
+            background-color: #fee2e2; /* red-100 */
+            border-left: 4px solid #ef4444; /* red-500 */
+        }
+        .course-elective {
+            background-color: #dbeafe; /* blue-100 */
+            border-left: 4px solid #3b82f6; /* blue-500 */
+        }
+        .course-graduate {
+            background-color: #f3e8ff; /* purple-100 */
+            border-left: 4px solid #9333ea; /* purple-600 */
+        }
+        th, td {
+            vertical-align: top;
+            padding: 8px;
+        }
+        th {
+            position: sticky;
+            top: 0;
+            background-color: #f1f5f9;
+            z-index: 10;
+        }
+        /* Print Styles */
+        @media print {
+            body {
+                background-color: #ffffff;
+                padding: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-full {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+            }
+            table {
+                page-break-inside: avoid;
+            }
+            .course-card {
+                box-shadow: none !important;
+                border: 1px solid #ddd !important;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto print-full">
+        <!-- Header -->
+        <header class="mb-6 text-center print:mb-4">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight" id="main-title">
+                圖書資訊學系 115學年度 第一學期課表 (115-1)
+            </h1>
+            <p class="text-slate-500 mt-2 text-sm md:text-base no-print">
+                整合最新學士班與碩士班課表，點擊課程卡片可查看詳細資訊。
+            </p>
+        </header>
+
+        <!-- Semester Switcher & Printing (No-print) -->
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 no-print">
+            <!-- Semester Switch Tabs -->
+            <div class="inline-flex rounded-lg p-1 bg-slate-200">
+                <button id="btn-1151" class="px-5 py-2.5 rounded-md font-medium text-sm transition-all duration-150 bg-white text-slate-800 shadow" onclick="switchSemester('1151')">
+                    115-1 第一學期
+                </button>
+                <button id="btn-1152" class="px-5 py-2.5 rounded-md font-medium text-sm transition-all duration-150 text-slate-600 hover:text-slate-800" onclick="switchSemester('1152')">
+                    115-2 第二學期
+                </button>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex items-center gap-2">
+                <button onclick="window.print()" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-medium px-4 py-2.5 rounded-lg text-sm shadow transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    列印此課表
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter Control Panel (No-print) -->
+        <div class="bg-white rounded-xl shadow-sm p-4 mb-6 border border-slate-200 no-print">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                <!-- Search bar -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">課程、教師或教室搜尋</label>
+                    <div class="relative">
+                        <input type="text" id="search-input" placeholder="輸入關鍵字 (如：曾品方、資料庫、LE105)" class="w-full pl-3 pr-10 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" oninput="applyFilters()">
+                        <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Grade Filter -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">年級篩選</label>
+                    <select id="grade-filter" class="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white" onchange="applyFilters()">
+                        <option value="all">全部年級</option>
+                        <option value="一">大一</option>
+                        <option value="二">大二</option>
+                        <option value="三">大三</option>
+                        <option value="四">大四</option>
+                        <option value="碩">碩士班</option>
+                    </select>
+                </div>
+
+                <!-- Type Filter -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">必選修篩選</label>
+                    <select id="type-filter" class="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white" onchange="applyFilters()">
+                        <option value="all">全部類型</option>
+                        <option value="必">必修</option>
+                        <option value="選">選修</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timetable View Grid -->
+        <div class="overflow-x-auto rounded-xl shadow-md border border-slate-200 bg-white">
+            <table class="w-full text-sm text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                        <th class="px-6 py-4 w-32 text-center bg-slate-100 border-r border-slate-200">節次 / 時間</th>
+                        <th class="px-4 py-4">星期一</th>
+                        <th class="px-4 py-4">星期二</th>
+                        <th class="px-4 py-4">星期三</th>
+                        <th class="px-4 py-4">星期四</th>
+                        <th class="px-4 py-4">星期五</th>
+                    </tr>
+                </thead>
+                <tbody id="timetable-body" class="divide-y divide-slate-100 bg-white">
+                    <!-- Javascript will render timetable rows here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Course Detail Modal -->
+    <div id="course-modal" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden transform scale-95 transition-all duration-200 ease-out" id="modal-container">
+            <div class="p-6 border-b border-slate-100" id="modal-header">
+                <div class="flex justify-between items-start">
+                    <h3 class="text-xl font-bold text-slate-800" id="modal-title">課程名稱</h3>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded-full hover:bg-slate-100 transition-colors">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 space-y-4 text-slate-600 text-sm">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <span class="block text-xs font-semibold text-slate-400 uppercase">開課年級</span>
+                        <p class="font-medium text-slate-800" id="modal-grade">-</p>
+                    </div>
+                    <div>
+                        <span class="block text-xs font-semibold text-slate-400 uppercase">選別類型</span>
+                        <p class="font-medium text-slate-800" id="modal-type">-</p>
+                    </div>
+                    <div>
+                        <span class="block text-xs font-semibold text-slate-400 uppercase">學分數</span>
+                        <p class="font-medium text-slate-800" id="modal-credits">-</p>
+                    </div>
+                    <div>
+                        <span class="block text-xs font-semibold text-slate-400 uppercase">上課教室</span>
+                        <p class="font-medium text-slate-800" id="modal-classroom">-</p>
+                    </div>
+                    <div>
+                        <span class="block text-xs font-semibold text-slate-400 uppercase">授課老師</span>
+                        <p class="font-medium text-slate-800" id="modal-teacher">-</p>
+                    </div>
+                    <div>
+                        <span class="block text-xs font-semibold text-slate-400 uppercase">上課節次</span>
+                        <p class="font-medium text-slate-800" id="modal-slots">-</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-6 py-4 flex justify-end">
+                <button onclick="closeModal()" class="bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors shadow">
+                    關閉
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const courseData1151 = [
+            // 大一 (115-1)
+            { name: "計算機概論", grade: "一", type: "必", credits: 3, teacher: "吳政叡/陳舜德", day: "星期一", slots: ["D2", "D3", "D4"], classroom: "LE205/LE106" },
+            { name: "國文", grade: "一", type: "必", credits: 2, teacher: "曾文瑩/吳文慧", day: "星期五", slots: ["D1", "D2"], classroom: "教室未定" },
+            { name: "體育", grade: "一", type: "必", credits: 0, teacher: "劉冠駿", day: "星期四", slots: ["D1", "D2"], classroom: "排球場" },
+            { name: "圖書館世界探索", grade: "一", type: "選", credits: 2, teacher: "林麗娟", day: "星期二", slots: ["D3", "D4"], classroom: "LE205" },
+            { name: "資訊組織", grade: "一", type: "必", credits: 2, teacher: "董蕙茹", day: "星期三", slots: ["D3", "D4"], classroom: "LE205" },
+            { name: "外國語文(初級/中級英文)", grade: "一", type: "必", credits: 2, teacher: "湯智群/黃妃伶", day: "星期四", slots: ["D3", "D4"], classroom: "教室未定" },
+            { name: "參考資源", grade: "一", type: "必", credits: 2, teacher: "董蕙茹", day: "星期五", slots: ["D3", "D4"], classroom: "LE205" },
+            { name: "人工智慧應用概論", grade: "一", type: "必", credits: 2, teacher: "杜海倫", day: "星期二", slots: ["D5", "D6"], classroom: "LE205" },
+            { name: "導師時間", grade: "一", type: "必", credits: 0, teacher: "黃元鶴", day: "星期三", slots: ["D5", "D6"], classroom: "LE205" },
+            { name: "圖書資訊學導論", grade: "一", type: "必", credits: 2, teacher: "曾品方", day: "星期二", slots: ["D7", "D8"], classroom: "LE205" },
+            { name: "大學入門", grade: "一", type: "必", credits: 2, teacher: "黃元鶴", day: "星期三", slots: ["D7", "D8"], classroom: "LE205" },
+
+            // 大二 (115-1)
+            { name: "主題分析", grade: "二", type: "必", credits: 2, teacher: "曾品方", day: "星期一", slots: ["D3", "D4"], classroom: "LE105" },
+            { name: "人生哲學", grade: "二", type: "必", credits: 2, teacher: "簡銓堯", day: "星期一", slots: ["D5", "D6"], classroom: "LE105" },
+            { name: "學術檢索與寫作", grade: "二", type: "選", credits: 2, teacher: "曾品方", day: "星期一", slots: ["D5", "D6"], classroom: "LE503" },
+            { name: "品牌化與圖書館", grade: "二", type: "選", credits: 2, teacher: "薛雅尤", day: "星期一", slots: ["D7", "D8"], classroom: "LE105" },
+            { name: "資料庫系統概論", grade: "二", type: "必", credits: 3, teacher: "陳舜德", day: "星期二", slots: ["D3", "D4", "DN"], classroom: "LE105" },
+            { name: "影音剪輯創作實務", grade: "二", type: "選", credits: 2, teacher: "陳啟維", day: "星期二", slots: ["D5", "D6"], classroom: "LE105" },
+            { name: "醫學資訊資源與服務", grade: "二", type: "選", credits: 2, teacher: "邱子恒", day: "星期二", slots: ["D7", "D8"], classroom: "LE105" },
+            { name: "統計學", grade: "二", type: "必", credits: 2, teacher: "黃元鶴", day: "星期三", slots: ["D3", "D4"], classroom: "LE105" },
+            { name: "導師時間", grade: "二", type: "必", credits: 0, teacher: "曾品方", day: "星期三", slots: ["D5", "D6"], classroom: "LE105" },
+            { name: "書目學理論與實務", grade: "二", type: "選", credits: 2, teacher: "陳冠至", day: "星期三", slots: ["D7", "D8"], classroom: "LE105" },
+            { name: "專利資訊", grade: "二", type: "選", credits: 2, teacher: "董蕙茹", day: "星期四", slots: ["D3", "D4"], classroom: "LE105" },
+            { name: "資料結構", grade: "二", type: "選", credits: 2, teacher: "吳政叡", day: "星期四", slots: ["D5", "D6"], classroom: "LE106" },
+            { name: "Linux桌面系統", grade: "二", type: "選", credits: 2, teacher: "何懷綸", day: "星期四", slots: ["D8", "E0"], classroom: "LE105" },
+            { name: "館藏發展", grade: "二", type: "必", credits: 2, teacher: "彭于萍", day: "星期五", slots: ["D3", "D4"], classroom: "LE106" },
+            { name: "Python程式設計實務", grade: "二", type: "選", credits: 3, teacher: "杜海倫", day: "星期五", slots: ["DN", "D5", "D6"], classroom: "LE105" },
+
+            // 大三 (115-1)
+            { name: "網站架設與建置實務", grade: "三", type: "選", credits: 2, teacher: "洪偉翔", day: "星期三", slots: ["D1", "D2"], classroom: "LE105" },
+            { name: "大數據資料分析與應用", grade: "三", type: "選", credits: 3, teacher: "杜海倫", day: "星期二", slots: ["D2", "D3", "D4"], classroom: "LE106" },
+            { name: "讀者服務", grade: "三", type: "必", credits: 2, teacher: "彭于萍", day: "星期二", slots: ["D5", "D6"], classroom: "LE106" },
+            { name: "資訊使用者行為探索", grade: "三", type: "選", credits: 2, teacher: "曾品方", day: "星期三", slots: ["D3", "D4"], classroom: "LE106" },
+            { name: "導師時間", grade: "三", type: "必", credits: 0, teacher: "陳冠至", day: "星期三", slots: ["D5", "D6"], classroom: "LE106" },
+            { name: "檔案管理與加值行銷", grade: "三", type: "選", credits: 2, teacher: "張嘉彬", day: "星期二", slots: ["D7", "D8"], classroom: "LE305" },
+            { name: "版本學與古籍保護", grade: "三", type: "選", credits: 2, teacher: "陳冠至", day: "星期四", slots: ["D5", "D6"], classroom: "LE105" },
+            { name: "圖書館史", grade: "三", type: "選", credits: 2, teacher: "陳冠至", day: "星期五", slots: ["D3", "D4"], classroom: "LE105" },
+            { name: "互動式媒體設計", grade: "三", type: "選", credits: 3, teacher: "周遵儒", day: "星期五", slots: ["D5", "D6", "D7"], classroom: "LE106" },
+
+            // 大四 (115-1)
+            { name: "系統分析與設計", grade: "四", type: "必", credits: 3, teacher: "李正吉", day: "星期一", slots: ["D2", "D3", "D4"], classroom: "LE305" },
+            { name: "圖書館實務", grade: "四", type: "必", credits: 1, teacher: "吳敏萱", day: "星期一", slots: ["D8"], classroom: "LE106" },
+            { name: "導師時間", grade: "四", type: "必", credits: 0, teacher: "吳政叡", day: "星期三", slots: ["D5", "D6"], classroom: "LE2A" },
+            { name: "資訊服務機構管理", grade: "四", type: "必", credits: 2, teacher: "黃元鶴", day: "星期四", slots: ["D7", "D8"], classroom: "LE205" },
+
+            // 碩士班 (115-1)
+            { name: "學術檢索與寫作", grade: "碩", type: "選", credits: 2, teacher: "曾品方", day: "星期一", slots: ["D5", "D6"], classroom: "LE503" },
+            { name: "研究方法", grade: "碩", type: "必", credits: 3, teacher: "黃元鶴", day: "星期二", slots: ["D2", "D3", "D4"], classroom: "LE503" },
+            { name: "質性研究", grade: "碩", type: "選", credits: 2, teacher: "邱子恒", day: "星期二", slots: ["D5", "D6"], classroom: "LE503" },
+            { name: "服務行銷", grade: "碩", type: "選", credits: 2, teacher: "彭于萍", day: "星期二", slots: ["D7", "D8"], classroom: "LE106" },
+            { name: "網站規劃與設計", grade: "碩", type: "選", credits: 2, teacher: "李正吉", day: "星期三", slots: ["D3", "D4"], classroom: "LE503" },
+            { name: "模糊邏輯導論", grade: "碩", type: "選", credits: 2, teacher: "吳政叡", day: "星期四", slots: ["D3", "D4"], classroom: "LE503" },
+            { name: "古籍資源管理", grade: "碩", type: "選", credits: 2, teacher: "陳冠至", day: "星期四", slots: ["D7", "D8"], classroom: "LE503" },
+            { name: "自然語言處理實作", grade: "碩", type: "選", credits: 2, teacher: "杜海倫", day: "星期五", slots: ["D3", "D4"], classroom: "LE305/LE401" },
+            { name: "圖書資訊議題研討", grade: "碩", type: "必", credits: 2, teacher: "董蕙茹", day: "星期五", slots: ["D5", "D6"], classroom: "LE503" }
+        ];
+
+        const courseData1152 = [
+            // 大一 (115-2)
+            { name: "計算機概論", grade: "一", type: "必", credits: 3, teacher: "吳政叡/陳舜德", day: "星期一", slots: ["D2", "D3", "D4"], classroom: "LE205/LE106" },
+            { name: "教育概論", grade: "一", type: "必", credits: 2, teacher: "衛欣齊", day: "星期一", slots: ["D5", "D6"], classroom: "LE205" },
+            { name: "圖書館世界探索", grade: "一", type: "選", credits: 2, teacher: "林麗娟", day: "星期二", slots: ["D3", "D4"], classroom: "LE205" },
+            { name: "人工智慧應用概論", grade: "一", type: "必", credits: 2, teacher: "杜海倫", day: "星期二", slots: ["D5", "D6"], classroom: "LE205" },
+            { name: "圖書資訊學導論", grade: "一", type: "必", credits: 2, teacher: "曾品方", day: "星期二", slots: ["D7", "D8"], classroom: "LE205" },
+            { name: "資訊組織", grade: "一", type: "必", credits: 2, teacher: "董蕙茹", day: "星期三", slots: ["D3", "D4"], classroom: "LE205" },
+            { name: "導師時間", grade: "一", type: "必", credits: 0, teacher: "黃元鶴", day: "星期三", slots: ["D5", "D6"], classroom: "LE205" },
+            { name: "體育", grade: "一", type: "必", credits: 0, teacher: "劉冠駿", day: "星期四", slots: ["D1", "D2"], classroom: "排球場" },
+            { name: "外國語文(初級/中級英文)", grade: "一", type: "必", credits: 2, teacher: "湯智群/黃妃伶", day: "星期四", slots: ["D3", "D4"], classroom: "教室未定" },
+            { name: "國文", grade: "一", type: "必", credits: 2, teacher: "曾文瑩/吳文慧", day: "星期五", slots: ["D1", "D2"], classroom: "教室未定" },
+            { name: "參考資源", grade: "一", type: "必", credits: 2, teacher: "董蕙茹", day: "星期五", slots: ["D3", "D4"], classroom: "LE205" },
+
+            // 大二 (115-2)
+            { name: "主題分析", grade: "二", type: "必", credits: 2, teacher: "曾品方", day: "星期一", slots: ["D3", "D4"], classroom: "LE105" },
+            { name: "人生哲學", grade: "二", type: "必", credits: 2, teacher: "王以嫻", day: "星期一", slots: ["D5", "D6"], classroom: "LE105" },
+            { name: "計算機網路", grade: "二", type: "必", credits: 3, teacher: "李正吉", day: "星期二", slots: ["D2", "D3", "D4"], classroom: "LE105" },
+            { name: "資訊視覺化概論", grade: "二", type: "選", credits: 2, teacher: "董蕙茹", day: "星期二", slots: ["D5", "D6"], classroom: "LE105" },
+            { name: "讀者洞察與網路行銷", grade: "二", type: "選", credits: 2, teacher: "薛雅尤", day: "星期二", slots: ["D7", "D8"], classroom: "LE105" },
+            { name: "統計學", grade: "二", type: "必", credits: 2, teacher: "黃元鶴", day: "星期三", slots: ["D3", "D4"], classroom: "LE105" },
+            { name: "導師時間", grade: "二", type: "必", credits: 0, teacher: "曾品方", day: "星期三", slots: ["D5", "D6"], classroom: "LE105" },
+            { name: "書目學理論與實務", grade: "二", type: "選", credits: 2, teacher: "陳冠至", day: "星期三", slots: ["D7", "D8"], classroom: "LE105" },
+            { name: "書目計量學導論", grade: "二", type: "選", credits: 2, teacher: "董蕙茹", day: "星期四", slots: ["D3", "D4"], classroom: "LE105" },
+            { name: "資料結構", grade: "二", type: "選", credits: 2, teacher: "吳政叡", day: "星期四", slots: ["D5", "D6"], classroom: "LE106" },
+            { name: "Koha圖書館管理系統", grade: "二", type: "選", credits: 2, teacher: "何懷綸", day: "星期四", slots: ["D8", "E0"], classroom: "LE105" },
+            { name: "館藏發展", grade: "二", type: "必", credits: 2, teacher: "彭于萍", day: "星期五", slots: ["D3", "D4"], classroom: "LE106" },
+            { name: "中小學圖書館與閱讀", grade: "二", type: "選", credits: 2, teacher: "曾品方", day: "星期五", slots: ["D5", "D6"], classroom: "LE105" },
+
+            // 大三 (115-2)
+            { name: "網頁設計", grade: "三", type: "選", credits: 2, teacher: "陳舜德", day: "星期三", slots: ["D1", "D2"], classroom: "LE105" },
+            { name: "作業系統", grade: "三", type: "必", credits: 3, teacher: "杜海倫", day: "星期二", slots: ["D3", "D4", "DN"], classroom: "LE106" },
+            { name: "資訊使用者行為探索", grade: "三", type: "選", credits: 2, teacher: "曾品方", day: "星期三", slots: ["D3", "D4"], classroom: "LE106" },
+            { name: "導師時間", grade: "三", type: "必", credits: 0, teacher: "陳冠至", day: "星期三", slots: ["D5", "D6"], classroom: "LE106" },
+            { name: "讀者服務", grade: "三", type: "必", credits: 2, teacher: "彭于萍", day: "星期二", slots: ["D5", "D6"], classroom: "LE106" },
+            { name: "檔案管理與加值行銷", grade: "三", type: "選", credits: 2, teacher: "張嘉彬", day: "星期二", slots: ["D7", "D8"], classroom: "LE305" },
+            { name: "版本學與古籍保護", grade: "三", type: "選", credits: 2, teacher: "陳冠至", day: "星期四", slots: ["D5", "D6"], classroom: "LE105" },
+            { name: "人工智慧應用實務", grade: "三", type: "選", credits: 3, teacher: "周遵儒", day: "星期五", slots: ["D5", "D6", "D7"], classroom: "LE106" },
+            { name: "圖書館史", grade: "三", type: "選", credits: 2, teacher: "陳冠至", day: "星期五", slots: ["D3", "D4"], classroom: "LE105" },
+
+            // 大四 (115-2)
+            { name: "導師時間", grade: "四", type: "必", credits: 0, teacher: "吳政叡", day: "星期三", slots: ["D5", "D6"], classroom: "LE2A" },
+            { name: "圖書館實務", grade: "四", type: "必", credits: 1, teacher: "吳敏萱", day: "星期一", slots: ["D8"], classroom: "LE106" },
+            { name: "專業倫理——圖書館倫理", grade: "四", type: "必", credits: 2, teacher: "陳冠至", day: "星期五", slots: ["D5", "D6"], classroom: "LE205" },
+            { name: "資訊服務機構管理", grade: "四", type: "必", credits: 2, teacher: "黃元鶴", day: "星期四", slots: ["D7", "D8"], classroom: "LE205" },
+
+            // 碩士班 (115-2)
+            { name: "資訊安全", grade: "三~碩", type: "選", credits: 3, teacher: "李正吉", day: "星期一", slots: ["D2", "D3", "D4"], classroom: "LE305" },
+            { name: "人工智慧", grade: "碩", type: "選", credits: 3, teacher: "杜海倫", day: "星期一", slots: ["DN", "D5", "D6"], classroom: "LE106" },
+            { name: "資訊服務機構人力資源管理", grade: "三~碩", type: "選", credits: 2, teacher: "彭于萍", day: "星期二", slots: ["D7", "D8"], classroom: "LE106" },
+            { name: "量化研究與統計分析", grade: "碩", type: "選", credits: 2, teacher: "黃元鶴", day: "星期三", slots: ["D7", "D8"], classroom: "LE106" },
+            { name: "元資料概論", grade: "碩", type: "選", credits: 2, teacher: "吳政叡", day: "星期四", slots: ["D3", "D4"], classroom: "LE503" },
+            { name: "古籍整理與利用", grade: "碩", type: "選", credits: 2, teacher: "陳冠至", day: "星期四", slots: ["D7", "D8"], classroom: "LE503" },
+            { name: "資訊檢索", grade: "三~碩", type: "選", credits: 3, teacher: "陳舜德", day: "星期五", slots: ["D2", "D3", "D4"], classroom: "LE305" },
+            { name: "圖書資訊議題研討", grade: "碩", type: "必", credits: 2, teacher: "董蕙茹", day: "星期五", slots: ["D5", "D6"], classroom: "LE503" }
+        ];
+
+        const timeSlots = [
+            { id: "D1-D2", label: "D1-D2", time: "08:10-10:00" },
+            { id: "D3-D4", label: "D3-D4", time: "10:10-12:00" },
+            { id: "D5-D6", label: "D5-D6", time: "13:40-15:30" },
+            { id: "D7-D8", label: "D7-D8", time: "15:40-17:30" },
+            { id: "D8-E0", label: "D8-E0", time: "16:40-18:30" },
+        ];
+        const days = ["星期一", "星期二", "星期三", "星期四", "星期五"];
+        const gradeOrder = { "一": 1, "二": 2, "三": 3, "四": 4, "碩": 5 };
+
+        // Current Active Semester (defaults to 115-1)
+        let currentSemester = '1151';
+
+        function getActiveDataset() {
+            return currentSemester === '1151' ? courseData1151 : courseData1152;
+        }
+
+        function getCourseClass(course) {
+            if (course.grade === '碩') return 'course-graduate';
+            return (course.type === '必' || course.type === '必修') ? 'course-required' : 'course-elective';
+        }
+
+        // Switch semester view
+        function switchSemester(sem) {
+            currentSemester = sem;
+            const btn1151 = document.getElementById('btn-1151');
+            const btn1152 = document.getElementById('btn-1152');
+            const mainTitle = document.getElementById('main-title');
+
+            if (sem === '1151') {
+                btn1151.className = "px-5 py-2.5 rounded-md font-medium text-sm transition-all duration-150 bg-white text-slate-800 shadow";
+                btn1152.className = "px-5 py-2.5 rounded-md font-medium text-sm transition-all duration-150 text-slate-600 hover:text-slate-800";
+                mainTitle.innerText = "圖書資訊學系 115學年度 第一學期課表 (115-1)";
+            } else {
+                btn1152.className = "px-5 py-2.5 rounded-md font-medium text-sm transition-all duration-150 bg-white text-slate-800 shadow";
+                btn1151.className = "px-5 py-2.5 rounded-md font-medium text-sm transition-all duration-150 text-slate-600 hover:text-slate-800";
+                mainTitle.innerText = "圖書資訊學系 115學年度 第二學期課表 (115-2)";
+            }
+
+            applyFilters();
+        }
+
+        function renderTimetable(courses) {
+            const timetableBody = document.getElementById('timetable-body');
+            if (!timetableBody) return;
+            timetableBody.innerHTML = '';
+
+            const schedule = {};
+            timeSlots.forEach(slot => {
+                schedule[slot.id] = {};
+                days.forEach(day => {
+                    schedule[slot.id][day] = [];
+                });
+            });
+
+            // Map and classify into time slots
+            courses.forEach(course => {
+                let targetSlotId = '';
+
+                if (course.slots.includes("E0") || (course.slots.includes("D8") && !course.slots.includes("D7"))) {
+                    targetSlotId = "D8-E0";
+                } else if (course.slots.includes("D7") && course.slots.includes("D8")) {
+                    targetSlotId = "D7-D8";
+                } else if (course.slots.includes("D5") && course.slots.includes("D6")) {
+                    targetSlotId = "D5-D6";
+                } else if (course.slots.includes("D3") && course.slots.includes("D4")) {
+                    targetSlotId = "D3-D4";
+                } else if (course.slots.includes("D1") && course.slots.includes("D2")) {
+                    targetSlotId = "D1-D2";
+                } else if (course.slots.includes("DN")) {
+                    // Decide where DN courses go based on their adjacent slots
+                    if (course.slots.includes("D4")) targetSlotId = "D3-D4";
+                    else if (course.slots.includes("D5")) targetSlotId = "D5-D6";
+                }
+
+                if (targetSlotId && schedule[targetSlotId] && schedule[targetSlotId][course.day]) {
+                    schedule[targetSlotId][course.day].push(course);
+                }
+            });
+
+            // Sort logic inside each cells according to requirements
+            Object.keys(schedule).forEach(slotId => {
+                days.forEach(day => {
+                    schedule[slotId][day].sort((a, b) => {
+                        let aSort = 0;
+                        let bSort = 0;
+
+                        // Case: D2-D4 courses (3 slots starting early) go to the top
+                        const aSpansD2D4 = a.slots.includes('D2') && a.slots.includes('D4');
+                        const bSpansD2D4 = b.slots.includes('D2') && b.slots.includes('D4');
+                        if (aSpansD2D4) aSort = -1;
+                        if (bSpansD2D4) bSort = -1;
+
+                        // Case: DN or D7 overlapping classes go to the bottom
+                        if (slotId === 'D3-D4') {
+                            if (a.slots.includes('DN')) aSort = 1;
+                            if (b.slots.includes('DN')) bSort = 1;
+                        } else if (slotId === 'D5-D6') {
+                            if (a.slots.includes('D7')) aSort = 1;
+                            if (b.slots.includes('D7')) bSort = 1;
+                        }
+
+                        if (aSort !== bSort) return aSort - bSort;
+
+                        // Default sorting: Grade (一 -> 二 -> 三 -> 四 -> 碩)
+                        return (gradeOrder[a.grade] || 99) - (gradeOrder[b.grade] || 99);
+                    });
+                });
+            });
+
+            // Generate HTML table structure
+            timeSlots.forEach(slot => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-100 hover:bg-slate-50/50 transition-colors';
+                
+                // Time Slot Header Column
+                row.innerHTML = `
+                    <th scope="row" class="px-6 py-4 font-semibold text-slate-700 bg-slate-50 align-middle text-center border-r border-slate-200">
+                        <div class="text-base font-bold tracking-tight">${slot.label}</div>
+                        <div class="text-xs text-slate-400 font-normal mt-1">${slot.time}</div>
+                    </th>
+                `;
+
+                // Days Columns
+                days.forEach(day => {
+                    const cell = document.createElement('td');
+                    cell.className = 'px-3 py-3 align-top border-r border-slate-100 min-w-[150px]';
+                    
+                    let cellContent = '';
+                    const cellCourses = schedule[slot.id]?.[day] || [];
+
+                    if (cellCourses.length > 0) {
+                        cellCourses.forEach(course => {
+                            const courseClass = getCourseClass(course);
+                            
+                            // 3-hour courses or custom segments show detailed slot details in brackets
+                            let teacherDisplay = course.teacher;
+                            if (course.slots.length >= 3) {
+                                teacherDisplay = `${course.teacher} (${course.slots.join(', ')})`;
+                            }
+
+                            cellContent += `
+                                <div class="course-card ${courseClass}" onclick="openModal(${JSON.stringify(course).replace(/"/g, '&quot;')})">
+                                    <div class="name text-slate-800 font-bold">${course.name}</div>
+                                    <div class="details mt-1.5 font-medium">
+                                        <span class="text-slate-500">${course.grade} / ${course.type} / ${course.credits} / ${course.classroom || "教室未定"}</span>
+                                        <div class="text-slate-600 font-semibold mt-1 flex justify-between items-center text-xs">
+                                            <span>${teacherDisplay}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+                    cell.innerHTML = cellContent;
+                    row.appendChild(cell);
+                });
+                timetableBody.appendChild(row);
+            });
+        }
+
+        // Filtering function
+        function applyFilters() {
+            const searchQuery = document.getElementById('search-input').value.trim().toLowerCase();
+            const selectedGrade = document.getElementById('grade-filter').value;
+            const selectedType = document.getElementById('type-filter').value;
+
+            const fullDataset = getActiveDataset();
+
+            const filtered = fullDataset.filter(course => {
+                const matchesSearch = course.name.toLowerCase().includes(searchQuery) || 
+                                      course.teacher.toLowerCase().includes(searchQuery) ||
+                                      (course.classroom && course.classroom.toLowerCase().includes(searchQuery));
+                
+                const matchesGrade = selectedGrade === 'all' || course.grade === selectedGrade;
+                const matchesType = selectedType === 'all' || course.type === selectedType;
+
+                return matchesSearch && matchesGrade && matchesType;
+            });
+
+            renderTimetable(filtered);
+        }
+
+        // Modal Controls
+        function openModal(course) {
+            const modal = document.getElementById('course-modal');
+            const container = document.getElementById('modal-container');
+            
+            document.getElementById('modal-title').innerText = course.name;
+            document.getElementById('modal-grade').innerText = `大${course.grade} (或碩士班)`;
+            document.getElementById('modal-type').innerText = course.type === '必' ? '必修課程' : '選修課程';
+            document.getElementById('modal-credits').innerText = `${course.credits} 學分`;
+            document.getElementById('modal-classroom').innerText = course.classroom || "教室未定";
+            document.getElementById('modal-teacher').innerText = course.teacher;
+            document.getElementById('modal-slots').innerText = `${course.day} ${course.slots.join(', ')}`;
+
+            // Dynamically set header border color based on type
+            const header = document.getElementById('modal-header');
+            header.className = "p-6 border-b-4 " + 
+                (course.grade === '碩' ? 'border-purple-500' : (course.type === '必' ? 'border-red-500' : 'border-blue-500'));
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                container.classList.remove('scale-95');
+                container.classList.add('scale-100');
+            }, 50);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('course-modal');
+            const container = document.getElementById('modal-container');
+            
+            container.classList.remove('scale-100');
+            container.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 150);
+        }
+
+        // Close modal on background click
+        document.getElementById('course-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // Initialize view on load
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTimetable(courseData1151);
+        });
+    </script>
+</body>
+</html>
